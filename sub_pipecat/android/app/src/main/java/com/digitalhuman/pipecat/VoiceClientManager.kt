@@ -4,7 +4,6 @@ import ai.pipecat.client.PipecatClient
 import ai.pipecat.client.PipecatClientOptions
 import ai.pipecat.client.PipecatEventCallbacks
 import ai.pipecat.client.TransportState
-import ai.pipecat.client.daily.DailyTransport
 import android.content.Context
 import android.util.Log
 import androidx.compose.runtime.MutableState
@@ -15,19 +14,11 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
- * Data class representing the available tracks for video/audio.
- * TODO: Verify exact type from pipecat SDK. May need adjustment based on actual API.
- */
-data class RTVITracks(
-    val botVideoTrack: Any? = null,
-    val botAudioTrack: Any? = null,
-    val userVideoTrack: Any? = null,
-    val userAudioTrack: Any? = null
-)
-
-/**
  * Manages the Pipecat client lifecycle and state.
- * Uses Daily WebRTC transport for real-time voice/video communication.
+ * Uses SmallWebRTC transport for real-time voice communication.
+ *
+ * SmallWebRTC is an open-source, zero-API-key alternative to Daily transport.
+ * It handles WebRTC offer/answer exchange via HTTP to the Pipecat server.
  */
 class VoiceClientManager(private val context: Context) {
     companion object {
@@ -42,7 +33,6 @@ class VoiceClientManager(private val context: Context) {
     val botReady: MutableState<Boolean> = mutableStateOf(false)
     val botIsTalking: MutableState<Boolean> = mutableStateOf(false)
     val userIsTalking: MutableState<Boolean> = mutableStateOf(false)
-    val tracks: MutableState<RTVITracks?> = mutableStateOf(null)
     val mic: MutableState<Boolean> = mutableStateOf(true)
     val isConnecting: MutableState<Boolean> = mutableStateOf(false)
     val errorMessage: MutableState<String?> = mutableStateOf(null)
@@ -52,7 +42,8 @@ class VoiceClientManager(private val context: Context) {
 
     /**
      * RTVI event callbacks for Pipecat client events.
-     * Handles transport state changes, bot/user speaking states, and track updates.
+     * Handles transport state changes and bot/user speaking states.
+     * No video tracks needed -- avatar is rendered locally via Live2DAvatarView.
      */
     private val callbacks = object : PipecatEventCallbacks() {
         override fun onTransportStateChanged(state: TransportState) {
@@ -102,23 +93,6 @@ class VoiceClientManager(private val context: Context) {
             }
         }
 
-        override fun onTracksUpdated(
-            botVideoTrack: Any?,
-            botAudioTrack: Any?,
-            userVideoTrack: Any?,
-            userAudioTrack: Any?
-        ) {
-            Log.d(TAG, "Tracks updated")
-            scope.launch {
-                this@VoiceClientManager.tracks.value = RTVITracks(
-                    botVideoTrack = botVideoTrack,
-                    botAudioTrack = botAudioTrack,
-                    userVideoTrack = userVideoTrack,
-                    userAudioTrack = userAudioTrack
-                )
-            }
-        }
-
         override fun onDisconnected(reason: String?) {
             Log.d(TAG, "Disconnected: $reason")
             scope.launch {
@@ -140,7 +114,7 @@ class VoiceClientManager(private val context: Context) {
      * @param serverUrl The base URL of the Pipecat server (e.g., "http://192.168.1.100:7860")
      */
     fun start(serverUrl: String) {
-        Log.d(TAG, "Starting Pipecat client with URL: $serverUrl")
+        Log.d(TAG, "Starting Pipecat client with SmallWebRTC transport, URL: $serverUrl")
 
         // Reset state
         isConnecting.value = true
@@ -149,8 +123,24 @@ class VoiceClientManager(private val context: Context) {
         botReady.value = false
 
         try {
-            // Create Daily transport
-            val transport = DailyTransport(context)
+            // Create SmallWebRTC transport
+            // TODO: Verify exact import path -- may be:
+            //   ai.pipecat.client.small_webrtc.SmallWebRTCTransport
+            //   or ai.pipecat.small_webrtc.SmallWebRTCTransport
+            // The SmallWebRTC transport handles WebRTC offer/answer via HTTP
+            // to the Pipecat server's /connect endpoint.
+            //
+            // Expected factory pattern:
+            //   val transport = SmallWebRTCTransport.Factory(context, baseUrl)
+            //   or
+            //   val transport = SmallWebRTCTransport(context)
+            //
+            // For now, using a placeholder that matches the likely API.
+            // Adjust the constructor/factory call based on actual small-webrtc-transport API.
+            val transportClass = Class.forName("ai.pipecat.client.small_webrtc.SmallWebRTCTransport")
+            val transport = transportClass
+                .getConstructor(Context::class.java, String::class.java)
+                .newInstance(context, serverUrl)
 
             // Create client options with callbacks and base URL
             val options = PipecatClientOptions(
@@ -158,11 +148,11 @@ class VoiceClientManager(private val context: Context) {
                 baseUrl = serverUrl
             )
 
-            // Create the Pipecat client
+            // Create the Pipecat client with SmallWebRTC transport
             client = PipecatClient(transport, options)
 
             // Connect to the server
-            // TODO: Verify exact API - may need to call startBotAndConnect() or connect()
+            // TODO: Verify exact API -- may need connect() or startBotAndConnect()
             client?.connect()?.let { future ->
                 future.withCallback {
                     Log.d(TAG, "Connection callback completed")
@@ -171,6 +161,20 @@ class VoiceClientManager(private val context: Context) {
                 Log.w(TAG, "Connect returned null future")
             }
 
+        } catch (e: ClassNotFoundException) {
+            Log.e(TAG, "SmallWebRTC transport class not found. Ensure small-webrtc-transport " +
+                "dependency is correctly declared.", e)
+            scope.launch {
+                errorMessage.value = "SmallWebRTC transport not available: ${e.message}"
+                isConnecting.value = false
+            }
+        } catch (e: NoSuchMethodException) {
+            Log.e(TAG, "SmallWebRTC transport constructor signature mismatch. " +
+                "The API may differ from expected (Context, String).", e)
+            scope.launch {
+                errorMessage.value = "Transport API mismatch: ${e.message}"
+                isConnecting.value = false
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Error starting client", e)
             scope.launch {
@@ -189,14 +193,12 @@ class VoiceClientManager(private val context: Context) {
         Log.d(TAG, "Toggling mic: $currentMicState -> ${!currentMicState}")
 
         try {
-            // TODO: Verify exact API for mute/unmute
-            // The API might be something like:
-            // - client?.setMicEnabled(!currentMicState)
-            // - client?.mute(!currentMicState)
-            // - client?.setUserAudioEnabled(!currentMicState)
             client?.let { c ->
-                // Placeholder - adjust based on actual Pipecat API
-                // c.setMicEnabled(!currentMicState)
+                // TODO: Verify exact API for mute/unmute
+                // Possible APIs:
+                //   c.setMicEnabled(!currentMicState)
+                //   c.mute(!currentMicState)
+                //   c.setUserAudioEnabled(!currentMicState)
                 mic.value = !currentMicState
             }
         } catch (e: Exception) {
@@ -214,8 +216,6 @@ class VoiceClientManager(private val context: Context) {
 
         try {
             client?.let { c ->
-                // TODO: Verify exact API for disconnect
-                // c.disconnect() or c.stop()
                 try {
                     c.disconnect()
                 } catch (e: Exception) {

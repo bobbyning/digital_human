@@ -9,8 +9,7 @@ accompanistPermissions = "0.36.0"
 
 # Pipecat SDK versions (from Maven Central)
 pipecatClient = "1.1.0"
-pipecatDailyTransport = "1.1.0"
-dailyClient = "0.35.0"
+pipecatSmallWebrtcTransport = "0.3.7"
 
 # Kotlin
 kotlinStdlib = "2.0.20"
@@ -38,10 +37,7 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 
 # Pipecat SDK
 pipecat-client = { group = "ai.pipecat", name = "client", version.ref = "pipecatClient" }
-pipecat-daily-transport = { group = "ai.pipecat", name = "daily-transport", version.ref = "pipecatDailyTransport" }
-
-# Daily SDK (transitive dependency, but included for explicit usage)
-daily-client = { group = "co.daily", name = "client", version.ref = "dailyClient" }
+pipecat-small-webrtc-transport = { group = "ai.pipecat", name = "small-webrtc-transport", version.ref = "pipecatSmallWebrtcTransport" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

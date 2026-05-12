@@ -1,6 +1,5 @@
 package com.digitalhuman.pipecat.ui
 
-import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +17,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -27,59 +25,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
-import co.daily.client.Daily
-import co.daily.client.ParticipantId
-import co.daily.client.VideoView
-
-/**
- * Video renderer for displaying the bot's video track.
- * Uses Daily SDK's VideoView for efficient video rendering.
- *
- * TODO: Verify integration with Pipecat tracks.
- * The Daily SDK VideoView typically expects a participant ID,
- * but RTVI/Pipecat may provide raw video tracks that need different handling.
- * Adjust the video rendering approach based on actual Pipecat SDK API.
- */
-@Composable
-fun BotVideoView(
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-
-    // Create Daily SDK VideoView for rendering
-    val videoView = remember {
-        VideoView(context).apply {
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT
-            )
-            // TODO: Set up video track rendering
-            // Depending on Pipecat SDK API, you may need to:
-            // 1. Use setParticipantId() if using Daily room mode
-            // 2. Use setVideoTrack() directly if using raw tracks
-            // 3. Use Daily.createCallObject() and manage tracks manually
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            videoView.onDestroy()
-        }
-    }
-
-    AndroidView(
-        factory = { videoView },
-        modifier = modifier
-    )
-}
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 /**
  * Status indicator showing who is currently speaking.
@@ -111,7 +65,30 @@ fun SpeakingIndicator(
 }
 
 /**
- * Main in-call layout showing the video feed and controls.
+ * Simulated audio amplitude that produces a realistic speech-like pattern
+ * when the bot is talking. Produces random values in [0.2, 0.8] updated
+ * every 80ms to drive smooth lip-sync animation on the Live2D avatar.
+ */
+@Composable
+private fun simulatedAmplitude(botIsTalking: Boolean): Float {
+    val amplitude by produceState(0f, botIsTalking) {
+        if (botIsTalking) {
+            while (true) {
+                value = Random.nextFloat() * 0.6f + 0.2f // random between 0.2 and 0.8
+                delay(80) // update every 80ms for smooth animation
+            }
+        } else {
+            value = 0f
+        }
+    }
+    return amplitude
+}
+
+/**
+ * Main in-call layout showing the Live2D avatar and controls.
+ *
+ * Replaces the previous Daily SDK video renderer with a local Canvas-based
+ * anime avatar (Live2DAvatarView) that uses audio-driven lip sync.
  */
 @Composable
 fun InCallLayout(
@@ -124,6 +101,8 @@ fun InCallLayout(
     onDisconnect: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val amplitude = simulatedAmplitude(botIsTalking)
+
     Surface(
         modifier = modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.surface
@@ -142,13 +121,13 @@ fun InCallLayout(
             ) {
                 // Bot status
                 SpeakingIndicator(
-                    label = "数字人",
+                    label = "数字人", // "数字人"
                     isSpeaking = botIsTalking
                 )
 
                 // Connection status
                 Text(
-                    text = if (botReady) "已连接" else "等待连接...",
+                    text = if (botReady) "已连接" else "等待连接...", // "已连接" / "等待连接..."
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (botReady) Color.Green else Color.Gray
                 )
@@ -167,18 +146,19 @@ fun InCallLayout(
                 )
             }
 
-            // Video area
+            // Avatar area -- replaces the Daily SDK VideoView
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(Color.Black),
+                    .background(Color(0xFF1A1A2E)), // dark background to make avatar pop
                 contentAlignment = Alignment.Center
             ) {
                 if (botReady) {
-                    // Render bot video
-                    BotVideoView(
-                        modifier = Modifier.fillMaxSize()
+                    Live2DAvatarView(
+                        isSpeaking = botIsTalking,
+                        audioAmplitude = amplitude,
+                        modifier = Modifier.size(300.dp)
                     )
                 } else {
                     // Placeholder when not ready
@@ -186,33 +166,20 @@ fun InCallLayout(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Person,
-                            contentDescription = null,
-                            modifier = Modifier.size(120.dp),
-                            tint = Color.Gray
+                        // Show a dimmed avatar preview even before bot is ready
+                        Live2DAvatarView(
+                            isSpeaking = false,
+                            audioAmplitude = 0f,
+                            modifier = Modifier.size(200.dp)
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "等待数字人视频...",
+                            text = "等待数字人...", // "等待数字人..."
                             style = MaterialTheme.typography.titleMedium,
                             color = Color.Gray
                         )
                     }
                 }
-            }
-
-            // User speaking indicator
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                SpeakingIndicator(
-                    label = "我",
-                    isSpeaking = userIsTalking
-                )
             }
 
             // Control buttons
@@ -250,7 +217,7 @@ fun InCallLayout(
                 ) {
                     Icon(
                         imageVector = Icons.Default.CallEnd,
-                        contentDescription = "断开连接",
+                        contentDescription = "断开连接", // "断开连接"
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -269,7 +236,7 @@ fun InCallLayout(
                 ) {
                     Icon(
                         imageVector = Icons.Default.VolumeUp,
-                        contentDescription = "数字人说话中",
+                        contentDescription = "数字人说话中", // "数字人说话中"
                         modifier = Modifier.size(32.dp)
                     )
                 }

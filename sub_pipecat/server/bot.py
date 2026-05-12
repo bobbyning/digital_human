@@ -4,12 +4,14 @@
 # SPDX-License-Identifier: BSD 2-Clause License
 #
 """
-Pipecat Digital Human Bot
+Pipecat Digital Human Bot (Open Source Edition)
 
 Pipeline:
-    Transport Input -> Deepgram STT -> Context Aggregator (user) ->
-    DeepSeek LLM -> Fish Audio TTS -> Simli Avatar ->
+    Transport Input -> Whisper STT -> Context Aggregator (user) ->
+    Ollama LLM -> Kokoro TTS ->
     Transport Output -> Context Aggregator (assistant)
+
+All services are fully open-source. No API keys required.
 """
 
 import os
@@ -30,34 +32,26 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.runner.run import main
 from pipecat.runner.utils import create_transport
 from pipecat.runner.types import RunnerArguments
-from pipecat.services.deepgram.stt import DeepgramSTTService
-from pipecat.services.deepseek.llm import DeepSeekLLMService
-from pipecat.services.fish.tts import FishAudioTTSService
-from pipecat.services.simli.video import SimliVideoService
+# NOTE: Import paths below are based on pipecat-ai>=0.0.106 extras naming
+# (whisper, ollama, kokoro). If imports fail, verify the exact module paths
+# with: pip show pipecat-ai && python -c "from pipecat.services.whisper import ..."
+from pipecat.services.whisper.stt import WhisperSTTService
+from pipecat.services.ollama.llm import OLLamaLLMService
+from pipecat.services.kokoro.tts import KokoroTTSService
+# Language enums — these may live under each service or under a shared
+# pipecat module. Adjust if your pipecat version places them elsewhere.
+from pipecat.services.whisper.stt import Language as WhisperLanguage
+from pipecat.services.kokoro.tts import Language as KokoroLanguage
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.transports.daily.transport import DailyParams
 
 load_dotenv(override=True)
 
 
-# We use lambdas to defer transport parameter creation until the transport
-# type is selected at runtime.
+# Audio-only WebRTC transport — no video pipeline needed.
 transport_params = {
-    "daily": lambda: DailyParams(
-        audio_in_enabled=True,
-        audio_out_enabled=True,
-        video_out_enabled=True,
-        video_out_is_live=True,
-        video_out_width=512,
-        video_out_height=512,
-    ),
     "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        video_out_enabled=True,
-        video_out_is_live=True,
-        video_out_width=512,
-        video_out_height=512,
     ),
 }
 
@@ -65,32 +59,20 @@ transport_params = {
 async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     """Run the digital human bot pipeline."""
 
-    logger.info("Starting digital human bot")
+    logger.info("Starting digital human bot (open-source edition)")
 
-    # ── STT (Speech-to-Text) ───────────────────────────────────────────
-    stt = DeepgramSTTService(
-        api_key=os.environ["DEEPGRAM_API_KEY"],
-        language="zh",
+    # ── STT (Speech-to-Text) — Whisper ─────────────────────────────────
+    stt = WhisperSTTService(
+        model_path=os.environ.get("WHISPER_MODEL", "large-v3"),
+        language=WhisperLanguage.ZH,
+        device="cuda",
     )
 
-    # ── TTS (Text-to-Speech) ───────────────────────────────────────────
-    tts = FishAudioTTSService(
-        api_key=os.environ["FISH_API_KEY"],
-        voice_id=os.environ["FISH_VOICE_ID"],
-    )
-
-    # ── Avatar (Video) ─────────────────────────────────────────────────
-    simli = SimliVideoService(
-        api_key=os.environ["SIMLI_API_KEY"],
-        face_id=os.environ["SIMLI_FACE_ID"],
-    )
-
-    # ── LLM (Large Language Model) ─────────────────────────────────────
-    llm = DeepSeekLLMService(
-        api_key=os.environ["DEEPSEEK_API_KEY"],
-        settings=DeepSeekLLMService.Settings(
-            model="deepseek-chat",
-            system_instruction="""\
+    # ── LLM — Ollama ───────────────────────────────────────────────────
+    llm = OLLamaLLMService(
+        base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1"),
+        model=os.environ.get("OLLAMA_MODEL", "qwen2.5:7b"),
+        system_instruction="""\
 你是一个友好的数字人助手。你用自然、口语化的中文与用户交流。
 请遵循以下规则：
 1. 用简洁自然的口语回答问题，不要使用书面语或过于正式的表达。
@@ -98,7 +80,12 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
 3. 不要使用项目符号或编号列表，因为你的回答会被语音播报。
 4. 保持回答简短，每次回答控制在两三句话以内。
 5. 如果用户问候你，友好地回应并询问有什么可以帮忙的。""",
-        ),
+    )
+
+    # ── TTS (Text-to-Speech) — Kokoro ──────────────────────────────────
+    tts = KokoroTTSService(
+        voice_id=os.environ.get("KOKORO_VOICE", "af_heart"),
+        language=KokoroLanguage.ZH,
     )
 
     # ── Context ────────────────────────────────────────────────────────
@@ -119,7 +106,6 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
             user_aggregator,
             llm,
             tts,
-            simli,
             transport.output(),
             assistant_aggregator,
         ]

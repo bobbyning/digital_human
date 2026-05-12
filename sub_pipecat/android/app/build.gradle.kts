@@ -64,8 +64,5 @@ dependencies {
 
     // Pipecat SDK
     implementation(libs.pipecat.client)
-    implementation(libs.pipecat.daily.transport)
-
-    // Daily SDK (for video rendering)
-    implementation(libs.daily.client)
+    implementation(libs.pipecat.small.webrtc.transport)
 }
