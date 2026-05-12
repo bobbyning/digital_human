@@ -1,0 +1,3 @@
+pipecat-ai[runner,daily,deepseek,fish,simli,deepgram]>=0.0.106
+python-dotenv
+loguru
