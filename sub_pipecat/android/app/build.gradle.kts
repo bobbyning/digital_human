@@ -65,4 +65,10 @@ dependencies {
     // Pipecat SDK
     implementation(libs.pipecat.client)
     implementation(libs.pipecat.small.webrtc.transport)
+
+    // Google WebRTC library -- provides SurfaceViewRenderer for rendering
+    // remote bot video stream received via SmallWebRTC transport.
+    // If the pipecat small-webrtc-transport already bundles this transitively,
+    // this line can be removed to avoid duplicate classes.
+    implementation(libs.google.webrtc)
 }

@@ -109,7 +109,9 @@ class MainActivity : ComponentActivity() {
                     onDisconnect = {
                         voiceClientManager.stop()
                         appState = null
-                    }
+                    },
+                    videoTrack = voiceClientManager.videoTrack.value,
+                    eglBaseContext = voiceClientManager.eglBaseContext.value
                 )
             }
         }

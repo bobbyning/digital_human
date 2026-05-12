@@ -46,12 +46,29 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 
 load_dotenv(override=True)
 
+# ── MuseTalk Avatar (optional) ─────────────────────────────────────────
+musetalk = None
+try:
+    from musetalk_service import MuseTalkVideoService
 
-# Audio-only WebRTC transport — no video pipeline needed.
+    musetalk = MuseTalkVideoService(
+        face_image_path=os.environ.get("MUSE_TALK_FACE_IMAGE", "face.png"),
+        device=os.environ.get("MUSE_TALK_DEVICE", "cuda"),
+    )
+    logger.info("MuseTalk avatar service initialized")
+except ImportError:
+    logger.warning("MuseTalk not installed. Running audio-only mode.")
+
+
+# Audio + Video WebRTC transport (for MuseTalk avatar)
 transport_params = {
     "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
+        video_out_enabled=True,
+        video_out_is_live=True,
+        video_out_width=512,
+        video_out_height=512,
     ),
 }
 
@@ -99,17 +116,24 @@ async def run_bot(transport: BaseTransport, runner_args: RunnerArguments):
     )
 
     # ── Pipeline ───────────────────────────────────────────────────────
-    pipeline = Pipeline(
-        [
-            transport.input(),
-            stt,
-            user_aggregator,
-            llm,
-            tts,
-            transport.output(),
-            assistant_aggregator,
-        ]
-    )
+    pipeline_steps = [
+        transport.input(),
+        stt,
+        user_aggregator,
+        llm,
+        tts,
+    ]
+
+    # Add MuseTalk avatar video generation if available
+    if musetalk:
+        pipeline_steps.append(musetalk)
+
+    pipeline_steps.extend([
+        transport.output(),
+        assistant_aggregator,
+    ])
+
+    pipeline = Pipeline(pipeline_steps)
 
     task = PipelineTask(
         pipeline,

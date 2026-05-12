@@ -38,12 +38,36 @@ class VoiceClientManager(private val context: Context) {
     val errorMessage: MutableState<String?> = mutableStateOf(null)
     val isDisconnected: MutableState<Boolean> = mutableStateOf(false)
 
+    // Remote video track from the bot (streamed via SmallWebRTC from the
+    // server-side MuseTalk renderer). Updated whenever a new track arrives.
+    // TODO: Replace Any? with org.webrtc.VideoTrack once the exact SmallWebRTC
+    //  transport API is confirmed. The SDK may expose the track through:
+    //  - A callback like onRemoteVideoTrack(VideoTrack)
+    //  - A property on the transport or client object
+    //  - An RTVI event such as onTrackStarted / onTrackReady
+    val videoTrack: MutableState<Any?> = mutableStateOf(null)
+
+    // EglBase context needed to initialize SurfaceViewRenderer for video playback.
+    // TODO: Initialize with org.webrtc.EglBase.create() once dependency is confirmed.
+    //  Store the underlying EGL context so BotVideoRenderer can use it:
+    //    val eglBase = EglBase.create()
+    //    val eglBaseContext = eglBase.eglBaseContext
+    val eglBaseContext: MutableState<Any?> = mutableStateOf(null)
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     /**
      * RTVI event callbacks for Pipecat client events.
-     * Handles transport state changes and bot/user speaking states.
-     * No video tracks needed -- avatar is rendered locally via Live2DAvatarView.
+     * Handles transport state changes, bot/user speaking states, and remote
+     * video track updates from the server-side MuseTalk renderer.
+     *
+     * TODO: Add video track callback once the SmallWebRTC transport API
+     *  confirms the mechanism for receiving remote video tracks. Likely
+     *  candidates:
+     *    override fun onRemoteVideoTrack(track: VideoTrack) { ... }
+     *    override fun onTrackStarted(trackInfo: TrackInfo) { ... }
+     *  Until then, videoTrack state will remain null and the UI will show
+     *  a placeholder.
      */
     private val callbacks = object : PipecatEventCallbacks() {
         override fun onTransportStateChanged(state: TransportState) {
@@ -121,6 +145,12 @@ class VoiceClientManager(private val context: Context) {
         errorMessage.value = null
         isDisconnected.value = false
         botReady.value = false
+        videoTrack.value = null
+
+        // Initialize EglBase for video rendering.
+        // TODO: Uncomment once org.webrtc dependency is confirmed at compile time:
+        //   val eglBase = EglBase.create()
+        //   eglBaseContext.value = eglBase.eglBaseContext
 
         try {
             // Create SmallWebRTC transport
@@ -235,6 +265,7 @@ class VoiceClientManager(private val context: Context) {
                 state.value = TransportState.DISCONNECTED
                 isDisconnected.value = true
                 isConnecting.value = false
+                videoTrack.value = null
             }
         }
     }

@@ -11,6 +11,9 @@ accompanistPermissions = "0.36.0"
 pipecatClient = "1.1.0"
 pipecatSmallWebrtcTransport = "0.3.7"
 
+# Google WebRTC library (provides SurfaceViewRenderer for remote video rendering)
+webrtc = "1.0.32006"
+
 # Kotlin
 kotlinStdlib = "2.0.20"
 kotlinxSerializationJson = "1.7.1"
@@ -38,6 +41,9 @@ accompanist-permissions = { group = "com.google.accompanist", name = "accompanis
 # Pipecat SDK
 pipecat-client = { group = "ai.pipecat", name = "client", version.ref = "pipecatClient" }
 pipecat-small-webrtc-transport = { group = "ai.pipecat", name = "small-webrtc-transport", version.ref = "pipecatSmallWebrtcTransport" }
+
+# Google WebRTC (for SurfaceViewRenderer to display remote bot video)
+google-webrtc = { group = "org.webrtc", name = "google-webrtc", version.ref = "webrtc" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

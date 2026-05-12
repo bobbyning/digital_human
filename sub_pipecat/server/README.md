@@ -7,7 +7,8 @@
 - **STT**: Whisper (本地语音识别)
 - **LLM**: Ollama (本地大语言模型)
 - **TTS**: Kokoro (开源语音合成)
-- **传输**: WebRTC (音频通话)
+- **Avatar**: MuseTalk (可选，真人头像唇形同步)
+- **传输**: WebRTC (音视频通话)
 
 ## 前置条件
 
@@ -74,8 +75,41 @@ python bot.py -t webrtc
 - 确保有足够的系统内存和 GPU VRAM
 - Kokoro TTS 可以在 CPU 上运行
 
+## MuseTalk 真人头像 (可选)
+
+MuseTalk 可以生成真实感更强的人脸视频，带唇形同步。
+
+### 安装步骤
+
+```bash
+# 1. 克隆 MuseTalk 仓库
+git clone https://github.com/TMElyralab/MuseTalk.git
+cd MuseTalk
+
+# 2. 安装依赖 (可能需要额外的 CUDA 环境)
+pip install -e .
+
+# 3. 下载模型权重
+# 参考 MuseTalk 仓库的说明下载必要的模型文件
+
+# 4. 准备一张参考人脸图片
+# 最好是正面照，脸部清晰，光照均匀
+
+# 5. 配置环境变量
+# 在 .env 文件中设置:
+# MUSE_TALK_FACE_IMAGE=/path/to/your/face.png
+# MUSE_TALK_DEVICE=cuda  # 或 cpu (较慢)
+```
+
+### 已知问题
+
+- MuseTalk 需要较新的 GPU (V100/A100 或更高)
+- 模型权重需要单独下载
+- 如果未安装 MuseTalk，服务会回退到纯音频模式
+
 ## 故障排除
 
 - 确保 Ollama 服务正在运行 (`ollama serve`)
 - 检查 GPU 驱动和 CUDA 是否正确安装
 - 首次运行会下载 Whisper 模型，请耐心等待
+- 如果 MuseTalk 报错，检查模型权重是否正确安装
