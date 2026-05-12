@@ -4,6 +4,7 @@ import ai.pipecat.client.PipecatClient
 import ai.pipecat.client.PipecatClientOptions
 import ai.pipecat.client.PipecatEventCallbacks
 import ai.pipecat.client.small_webrtc_transport.IceConfig
+import ai.pipecat.client.small_webrtc_transport.IceServer
 import ai.pipecat.client.small_webrtc_transport.SmallWebRTCTransport
 import ai.pipecat.client.small_webrtc_transport.SmallWebRTCTransportConnectParams
 import ai.pipecat.client.types.APIRequest
@@ -124,7 +125,7 @@ class VoiceClientManager(private val context: Context) {
      * @param serverUrl The base URL of the Pipecat server (e.g., "http://192.168.1.100:7860")
      */
     fun start(serverUrl: String) {
-        Log.d(TAG, "Starting Pipecat client with SmallWebRTC transport, URL: $serverUrl")
+        Log.e(TAG, "===== START CALLED with URL: $serverUrl =====")
 
         // Reset state
         isConnecting.value = true
@@ -134,8 +135,13 @@ class VoiceClientManager(private val context: Context) {
         videoTrack.value = null
 
         try {
-            // Create SmallWebRTC transport with default ICE config
-            val iceConfig = IceConfig(emptyList())
+            // Create SmallWebRTC transport with STUN servers for NAT traversal
+            val iceConfig = IceConfig(
+                listOf(
+                    IceServer(urls = listOf("stun:stun.l.google.com:19302")),
+                    IceServer(urls = listOf("stun:stun1.l.google.com:19302"))
+                )
+            )
             val transport = SmallWebRTCTransport(context, iceConfig)
 
             // Create client options with callbacks
@@ -148,11 +154,16 @@ class VoiceClientManager(private val context: Context) {
             // Create the Pipecat client with SmallWebRTC transport
             client = PipecatClient(transport, options)
 
-            // Connect to the server
+            // Build the offer endpoint URL from the server base URL
+            // The pipecat runner exposes POST /api/offer for SmallWebRTC signaling
+            val baseUrl = serverUrl.trimEnd('/')
+            val offerEndpoint = "$baseUrl/api/offer"
+
+            // Connect to the server via SmallWebRTC signaling
             val connectParams = SmallWebRTCTransportConnectParams(
                 webrtcRequestParams = APIRequest(
-                    endpoint = "",
-                    requestData = ai.pipecat.client.types.Value.Str("")
+                    endpoint = offerEndpoint,
+                    requestData = ai.pipecat.client.types.Value.Str("{}")
                 ),
                 iceConfig = iceConfig
             )
