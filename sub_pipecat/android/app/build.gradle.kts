@@ -54,6 +54,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.material.icons.extended)
 
     // Compose Debug
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -68,7 +69,6 @@ dependencies {
 
     // Google WebRTC library -- provides SurfaceViewRenderer for rendering
     // remote bot video stream received via SmallWebRTC transport.
-    // If the pipecat small-webrtc-transport already bundles this transitively,
-    // this line can be removed to avoid duplicate classes.
-    implementation(libs.google.webrtc)
+    // The pipecat small-webrtc-transport already bundles WebRTC classes,
+    // so we don't include google-webrtc separately to avoid duplicate classes.
 }

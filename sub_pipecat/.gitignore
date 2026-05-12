@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+*.egg-info/
+
+# Android
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db

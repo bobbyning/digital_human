@@ -4,4 +4,7 @@ loguru
 # MuseTalk for realistic avatar (install separately):
 #   git clone https://github.com/TMElyralab/MuseTalk.git
 #   cd MuseTalk && pip install -e .
-opencv-python-headless
+# opencv-python is installed as a dependency of pipecat-ai
+# MuseTalk for realistic avatar (install separately):
+#   git clone https://github.com/TMElyralab/MuseTalk.git
+#   cd MuseTalk && pip install -e .
