@@ -15,6 +15,12 @@ All services are fully open-source. No API keys required.
 """
 
 import os
+import sys
+
+# Add MuseTalk to Python path
+_musetalk_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "MuseTalk")
+if os.path.isdir(_musetalk_dir) and _musetalk_dir not in sys.path:
+    sys.path.insert(0, _musetalk_dir)
 
 from dotenv import load_dotenv
 from loguru import logger

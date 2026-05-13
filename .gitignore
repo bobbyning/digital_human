@@ -20,3 +20,10 @@ Thumbs.db
 
 # Environment
 .env
+
+# Large model weights (clone separately)
+sub_pipecat/server/MuseTalk/
+
+# Test artifacts
+*.wav
+test_audio*
